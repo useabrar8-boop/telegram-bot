@@ -2,7 +2,6 @@ import os
 import asyncio
 import re
 import urllib.request
-import urllib.parse
 import json
 from datetime import datetime
 import yt_dlp
@@ -48,43 +47,6 @@ def get_video_title_api(video_id):
         pass
     return None
 
-def get_stream_url(video_id, quality):
-    try:
-        base_opts = get_ydl_base()
-        if quality == "audio":
-            fmt = 'bestaudio/best'
-        else:
-            height_map = {"1080": 1080, "720": 720, "480": 480, "360": 360}
-            h = height_map.get(quality, 720)
-            fmt = f'bestvideo[height<={h}][ext=mp4]+bestaudio[ext=m4a]/best[height<={h}]/best'
-
-        ydl_opts = {
-            **base_opts,
-            'format': fmt,
-            'outtmpl': 'downloads/%(title)s.%(ext)s',
-            'restrictfilenames': True,
-            'merge_output_format': 'mp4',
-        }
-        if quality == "audio":
-            ydl_opts['postprocessors'] = [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }]
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url=f"https://www.youtube.com/watch?v={video_id}", download=True)
-            path = ydl.prepare_filename(info)
-            if quality == "audio":
-                path = os.path.splitext(path)[0] + ".mp3"
-            elif not path.endswith('.mp4'):
-                mp4 = os.path.splitext(path)[0] + ".mp4"
-                if os.path.exists(mp4):
-                    path = mp4
-            return path
-    except Exception as e:
-        raise e
-
 def get_video_title(url):
     video_id = get_youtube_id(url)
     if video_id and YOUTUBE_API_KEY:
@@ -97,43 +59,29 @@ def get_video_title(url):
         return info.get('title', 'ভিডিও')
 
 def download_video(url, quality):
-    video_id = get_youtube_id(url)
-    if video_id:
-        return get_stream_url(video_id, quality)
-
     base_opts = get_ydl_base()
+
     if quality == "audio":
+        # ffmpeg ছাড়াই audio download - m4a বা webm format এ
         ydl_opts = {
             **base_opts,
-            'format': 'bestaudio/best',
+            'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
             'outtmpl': 'downloads/%(title)s.%(ext)s',
             'restrictfilenames': True,
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
         }
     else:
         height_map = {"1080": 1080, "720": 720, "480": 480, "360": 360}
         height = height_map.get(quality, 720)
         ydl_opts = {
             **base_opts,
-            'format': f'bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={height}]/best',
+            'format': f'best[height<={height}][ext=mp4]/best[height<={height}]/best',
             'outtmpl': 'downloads/%(title)s.%(ext)s',
             'restrictfilenames': True,
-            'merge_output_format': 'mp4',
         }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         path = ydl.prepare_filename(info)
-        if quality == "audio":
-            path = os.path.splitext(path)[0] + ".mp3"
-        elif not path.endswith('.mp4'):
-            mp4 = os.path.splitext(path)[0] + ".mp4"
-            if os.path.exists(mp4):
-                path = mp4
         return path
 
 async def is_subscribed(bot, user_id):
@@ -207,7 +155,7 @@ async def show_quality_menu(message, url):
                 InlineKeyboardButton("🎞 360p", callback_data=f"dl|360|{url}"),
             ],
             [
-                InlineKeyboardButton("🎵 শুধু অডিও (MP3)", callback_data=f"dl|audio|{url}"),
+                InlineKeyboardButton("🎵 শুধু অডিও", callback_data=f"dl|audio|{url}"),
             ]
         ])
 
@@ -247,7 +195,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("❌ আগে চ্যানেলে জয়েন করুন!", show_alert=True)
             return
 
-        quality_names = {"1080": "1080p HD", "720": "720p", "480": "480p", "360": "360p", "audio": "MP3 Audio"}
+        quality_names = {"1080": "1080p HD", "720": "720p", "480": "480p", "360": "360p", "audio": "অডিও"}
         q_name = quality_names.get(quality, quality)
 
         await query.answer(f"⬇️ {q_name} ডাউনলোড শুরু হচ্ছে...")
