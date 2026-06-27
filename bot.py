@@ -2,7 +2,6 @@ import os
 import asyncio
 import re
 import urllib.request
-import urllib.parse
 import json
 from datetime import datetime
 import yt_dlp
@@ -33,11 +32,6 @@ def get_ydl_base():
     return {
         'quiet': True,
         'noplaylist': True,
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['android'],
-            }
-        },
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/112.0.0.0 Mobile Safari/537.36',
         },
@@ -57,8 +51,7 @@ def get_video_title_api(video_id):
     return None
 
 def get_video_title(url):
-    # Short link expand করো
-    if any(x in url for x in ['vt.tiktok.com', 'vm.tiktok.com', 't.co', 'bit.ly']):
+    if any(x in url for x in ['vt.tiktok.com', 'vm.tiktok.com', 'pin.it', 't.co', 'bit.ly']):
         url = expand_url(url)
 
     video_id = get_youtube_id(url)
@@ -73,8 +66,7 @@ def get_video_title(url):
         return info.get('title', 'ভিডিও')
 
 def download_video(url, quality):
-    # Short link expand করো
-    if any(x in url for x in ['vt.tiktok.com', 'vm.tiktok.com', 't.co', 'bit.ly']):
+    if any(x in url for x in ['vt.tiktok.com', 'vm.tiktok.com', 'pin.it', 't.co', 'bit.ly']):
         url = expand_url(url)
 
     base_opts = get_ydl_base()
@@ -91,7 +83,7 @@ def download_video(url, quality):
         height = height_map.get(quality, 720)
         ydl_opts = {
             **base_opts,
-            'format': f'best[height<={height}][ext=mp4]/best[height<={height}]/best',
+            'format': f'best[height<={height}]/best[height<={height}]/best',
             'outtmpl': 'downloads/%(title)s.%(ext)s',
             'restrictfilenames': True,
         }
