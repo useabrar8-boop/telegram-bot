@@ -53,13 +53,11 @@ def get_video_title_api(video_id):
 def get_video_title(url):
     if any(x in url for x in ['vt.tiktok.com', 'vm.tiktok.com', 'pin.it', 't.co', 'bit.ly']):
         url = expand_url(url)
-
     video_id = get_youtube_id(url)
     if video_id and YOUTUBE_API_KEY:
         title = get_video_title_api(video_id)
         if title:
             return title
-
     ydl_opts = get_ydl_base()
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
@@ -79,11 +77,9 @@ def download_video(url, quality):
             'restrictfilenames': True,
         }
     else:
-        height_map = {"1080": 1080, "720": 720, "480": 480, "360": 360}
-        height = height_map.get(quality, 720)
         ydl_opts = {
             **base_opts,
-            'format': f'best[height<={height}]/best[height<={height}]/best',
+            'format': 'best[ext=mp4]/best',
             'outtmpl': 'downloads/%(title)s.%(ext)s',
             'restrictfilenames': True,
         }
@@ -126,8 +122,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not re.match(r'^(http|https)://', text):
         await message.reply_text(
             "👋 স্বাগতম!\n\n"
-            "যেকোনো ভিডিও লিংক পাঠান এবং পছন্দের কোয়ালিটি বেছে নিন।\n\n"
-            "✅ YouTube, Facebook, TikTok, Instagram সহ ১০০০+ সাইট সাপোর্টেড।"
+            "যেকোনো ভিডিও লিংক পাঠান।\n\n"
+            "✅ Facebook, TikTok, Instagram, Pinterest সহ ১০০০+ সাইট সাপোর্টেড।"
         )
         return
 
@@ -145,10 +141,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    await show_quality_menu(message, text)
+    await show_menu(message, text)
 
-async def show_quality_menu(message, url):
-    status_msg = await message.reply_text("⏳ ভিডিও তথ্য সংগ্রহ করা হচ্ছে...")
+async def show_menu(message, url):
+    status_msg = await message.reply_text("⏳ লিংক প্রসেস হচ্ছে...")
     try:
         loop = asyncio.get_event_loop()
         title = await loop.run_in_executor(None, get_video_title, url)
@@ -156,21 +152,13 @@ async def show_quality_menu(message, url):
 
         keyboard = InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("🔥 1080p", callback_data=f"dl|1080|{url}"),
-                InlineKeyboardButton("📺 720p", callback_data=f"dl|720|{url}"),
-            ],
-            [
-                InlineKeyboardButton("📱 480p", callback_data=f"dl|480|{url}"),
-                InlineKeyboardButton("🎞 360p", callback_data=f"dl|360|{url}"),
-            ],
-            [
-                InlineKeyboardButton("🎵 শুধু অডিও", callback_data=f"dl|audio|{url}"),
+                InlineKeyboardButton("🎬 ভিডিও ডাউনলোড", callback_data=f"dl|video|{url}"),
+                InlineKeyboardButton("🎵 অডিও ডাউনলোড", callback_data=f"dl|audio|{url}"),
             ]
         ])
 
         await message.reply_text(
-            f"🎬 *{title}*\n\n"
-            "👇 কোন কোয়ালিটিতে ডাউনলোড করবেন বেছে নিন:",
+            f"🎬 *{title}*\n\n👇 কী ডাউনলোড করবেন?",
             reply_markup=keyboard,
             parse_mode="Markdown"
         )
@@ -189,7 +177,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if subscribed:
             await query.answer("✅ যাচাই সফল!")
             await query.message.delete()
-            await show_quality_menu(query.message, url)
+            await show_menu(query.message, url)
         else:
             await query.answer("❌ আপনি এখনো জয়েন করেননি!", show_alert=True)
         return
@@ -204,9 +192,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("❌ আগে চ্যানেলে জয়েন করুন!", show_alert=True)
             return
 
-        quality_names = {"1080": "1080p HD", "720": "720p", "480": "480p", "360": "360p", "audio": "অডিও"}
-        q_name = quality_names.get(quality, quality)
-
+        q_name = "ভিডিও" if quality == "video" else "অডিও"
         await query.answer(f"⬇️ {q_name} ডাউনলোড শুরু হচ্ছে...")
         await query.message.edit_text(f"📥 {q_name} ডাউনলোড হচ্ছে... অনুগ্রহ করে অপেক্ষা করুন।")
 
@@ -222,9 +208,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.edit_text("📤 আপলোড হচ্ছে...")
 
             if quality == "audio":
-                await query.message.reply_audio(audio=open(file_path, 'rb'), caption="✅ আপনার অডিও রেডি! 🎵")
+                await query.message.reply_audio(audio=open(file_path, 'rb'), caption="✅ অডিও রেডি! 🎵")
             else:
-                await query.message.reply_video(video=open(file_path, 'rb'), caption=f"✅ {q_name} ভিডিও রেডি! 🎬")
+                await query.message.reply_video(video=open(file_path, 'rb'), caption="✅ ভিডিও রেডি! 🎬")
 
             if os.path.exists(file_path):
                 os.remove(file_path)
