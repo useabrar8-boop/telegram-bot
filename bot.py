@@ -2,6 +2,7 @@ import os
 import asyncio
 import re
 import urllib.request
+import urllib.parse
 import json
 from datetime import datetime
 import yt_dlp
@@ -15,6 +16,14 @@ OWNER_ID = 5483673756
 YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
 
 os.makedirs("downloads", exist_ok=True)
+
+def expand_url(url):
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return r.url
+    except:
+        return url
 
 def get_youtube_id(url):
     match = re.search(r'(?:v=|youtu\.be/|embed/|shorts/)([a-zA-Z0-9_-]{11})', url)
@@ -30,7 +39,7 @@ def get_ydl_base():
             }
         },
         'http_headers': {
-            'User-Agent': 'com.google.android.youtube/17.36.4 (Linux; U; Android 12; GB) gzip',
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/112.0.0.0 Mobile Safari/537.36',
         },
     }
 
@@ -48,21 +57,29 @@ def get_video_title_api(video_id):
     return None
 
 def get_video_title(url):
+    # Short link expand করো
+    if any(x in url for x in ['vt.tiktok.com', 'vm.tiktok.com', 't.co', 'bit.ly']):
+        url = expand_url(url)
+
     video_id = get_youtube_id(url)
     if video_id and YOUTUBE_API_KEY:
         title = get_video_title_api(video_id)
         if title:
             return title
+
     ydl_opts = get_ydl_base()
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
         return info.get('title', 'ভিডিও')
 
 def download_video(url, quality):
+    # Short link expand করো
+    if any(x in url for x in ['vt.tiktok.com', 'vm.tiktok.com', 't.co', 'bit.ly']):
+        url = expand_url(url)
+
     base_opts = get_ydl_base()
 
     if quality == "audio":
-        # ffmpeg ছাড়াই audio download - m4a বা webm format এ
         ydl_opts = {
             **base_opts,
             'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
